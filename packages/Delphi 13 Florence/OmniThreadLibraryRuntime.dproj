@@ -8,7 +8,7 @@
         <Base>True</Base>
         <AppType>Package</AppType>
         <FrameworkType>None</FrameworkType>
-        <Platform Condition="'$(Platform)'==''">Win64x</Platform>
+        <Platform Condition="'$(Platform)'==''">Win32</Platform>
         <TargetedPlatforms>1048579</TargetedPlatforms>
         <ProjectName Condition="'$(ProjectName)'==''">OmniThreadLibraryRuntime</ProjectName>
     </PropertyGroup>
@@ -88,10 +88,12 @@
         <DCC_Namespace>Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
+        <DCC_DcpOutput>$(BDSCOMMONDIR)\Dcp</DCC_DcpOutput>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win64)'!=''">
         <AppEnableRuntimeThemes>true</AppEnableRuntimeThemes>
         <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
+        <DCC_DcpOutput>$(BDSCOMMONDIR)\Dcp\Win64</DCC_DcpOutput>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win64x)'!=''">
         <DCC_Namespace>Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;$(DCC_Namespace)</DCC_Namespace>
@@ -198,15 +200,7 @@
                     <VersionInfoKeys Name="ProductVersion">1.0.0.0</VersionInfoKeys>
                     <VersionInfoKeys Name="Comments"/>
                 </VersionInfoKeys>
-                <Excluded_Packages>
-                    <Excluded_Packages Name="x:\common\pkg\_packages\13\bpl\JclVcl370.bpl">JEDI Code Library VCL package</Excluded_Packages>
-                    <Excluded_Packages Name="x:\common\pkg\_packages\13\bpl\UIRibbonPackage370.bpl">File x:\common\pkg\_packages\13\bpl\UIRibbonPackage370.bpl not found</Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\bcboffice2k370.bpl">Embarcadero C++Builder Office 2000 Servers Package</Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\bcbofficexp370.bpl">Embarcadero C++Builder Office XP Servers Package</Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\dcloffice2k370.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\dclofficexp370.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
-                    <Excluded_Packages Name="X:\common\pkg\_packages\12\bpl\dclsgcWebSocketsD12.bpl">SGC WebSockets</Excluded_Packages>
-                </Excluded_Packages>
+                <Excluded_Packages/>
                 <isVersionControl>
                     <isVersionControl Name="isVersionControlID"/>
                 </isVersionControl>
