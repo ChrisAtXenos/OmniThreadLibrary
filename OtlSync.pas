@@ -4,7 +4,7 @@
 ///<license>
 ///This software is distributed under the BSD license.
 ///
-///Copyright (c) 2020, Primoz Gabrijelcic
+///Copyright (c) 2025, Primoz Gabrijelcic
 ///All rights reserved.
 ///
 ///Redistribution and use in source and binary forms, with or without modification,
@@ -36,10 +36,17 @@
 ///     Blog            : http://thedelphigeek.com
 ///   Contributors      : GJ, Lee_Nover, dottor_jeckill, Sean B. Durkin, VyPu
 ///   Creation date     : 2009-03-30
-///   Last modification : 2023-11-28
-///   Version           : 1.27d
+///   Last modification : 2025-11-11
+///   Version           : 1.28
 ///</para><para>
 ///   History:
+///     1.28: 2025-11-11
+///       - Implemented TLightweightMREWEx extension to TLightweightMREW (Delphi 11+ only).
+///         See https://www.thedelphigeek.com/2021/02/readers-writ-47358-48721-45511-46172.html
+///         for more information.
+///       - Added methods Enter: T and Leave to Locked<T>.
+///       - Added methods BeginRead, TryBeginRead, EndRead, BeginWrite,
+///         TryBeginWrite, EndWrite to Locked<T> (Delphi 11+ only).
 ///     1.27d: 2023-11-28
 ///       - Fixed hints & warnings.
 ///       - Locked<T>.Initialize without the 'factory' parameter could return
@@ -371,6 +378,29 @@ type
     {$ENDIF MSWINDOWS}
   end; { IOmniCancellationToken }
 
+  {$IFDEF OTL_HasLightweightMREW}
+  TLightweightMREWEx = record
+  private
+    FRWLock   : TLightweightMREW;
+    FLockCount: integer;
+    [volatile] FLockOwner: TThreadID;
+  public
+    class operator Initialize(out dest: TLightweightMREWEx);
+    procedure BeginRead; inline;
+    function TryBeginRead: boolean; {$IF defined(LINUX) or defined(ANDROID)}overload;{$IFEND} inline;
+    {$IF defined(LINUX) or defined(ANDROID)}
+    function TryBeginRead(timeout: cardinal): boolean; overload; inline;
+    {$IFEND LINUX or ANDROID}
+    procedure EndRead; inline;
+    procedure BeginWrite;
+    function TryBeginWrite: boolean; {$IF defined(LINUX) or defined(ANDROID)}overload;
+    function TryBeginWrite(timeout: cardinal): boolean; overload;
+    {$IFEND LINUX or ANDROID}
+    procedure EndWrite;
+    property LockCount: integer read FLockCount;
+  end;
+  {$ENDIF OTL_HasLightweightMREW}
+
   {$IFDEF OTL_Generics}
   Atomic<T> = class
     type TFactory = reference to function: T;
@@ -388,7 +418,7 @@ type
 
   Locked<T> = record
   strict private // keep those aligned!
-    FLock     : TOmniCS;
+    FLock     : {$IFDEF OTL_HasLightweightMREW}TLightweightMREWEx{$ELSE}TOmniCS{$ENDIF};
     FValue    : T;
   strict private
     FInitialized: boolean;
@@ -408,9 +438,24 @@ type
     function  Initialize: T; overload;
     {$ENDIF OTL_ERTTI}
     procedure Acquire; inline;
+    function  Enter: T; inline;
+    procedure Leave; inline;
     procedure Locked(proc: TProc); overload; inline;
     procedure Locked(proc: TProcT); overload; inline;
     procedure Release; inline;
+    {$IFDEF OTL_HasLightweightMREW}
+    function  BeginRead: T; inline;
+    procedure EndRead; inline;
+    function  TryBeginRead: boolean; {$IF defined(LINUX) or defined(ANDROID)}overload;{$IFEND} inline;
+    {$IF defined(LINUX) or defined(ANDROID)}
+    function  TryBeginRead(Timeout: Cardinal): Boolean; overload; inline;
+    {$IFEND LINUX or ANDROID}
+    function  BeginWrite: T; inline;
+    procedure EndWrite; inline;
+    function  TryBeginWrite: boolean; {$IF defined(LINUX) or defined(ANDROID)}overload;
+    function  TryBeginWrite(timeout: cardinal): boolean; overload; inline;
+    {$IFEND LINUX or ANDROID}
+    {$ENDIF OTL_HasLightweightMREW}
     procedure Free; inline;
     property Value: T read GetValue write SetValue;
   end; { Locked<T> }
@@ -1565,6 +1610,93 @@ end; { Atomic<I,T>.Initialize }
 
 {$ENDIF OTL_ERTTI}
 
+{$IFDEF OTL_HasLightweightMREW}
+
+{ TLightweightMREWEx }
+
+class operator TLightweightMREWEx.Initialize(out dest: TLightweightMREWEx);
+begin
+  Dest.FLockOwner := 0;
+end; { TLightweightMREWEx.Initialize }
+
+procedure TLightweightMREWEx.BeginRead;
+begin
+  FRWLock.BeginRead;
+end; { TLightweightMREWEx.BeginRead }
+
+procedure TLightweightMREWEx.BeginWrite;
+begin
+  if FLockOwner = TThread.Current.ThreadID then
+    Inc(FLockCount)
+  else begin
+    FRWLock.BeginWrite;
+    FLockOwner := TThread.Current.ThreadID;
+    FLockCount := 1;
+  end;
+end; { TLightweightMREWEx.BeginWrite }
+
+procedure TLightweightMREWEx.EndRead;
+begin
+  FRWLock.EndRead;
+end; { TLightweightMREWEx.EndRead }
+
+procedure TLightweightMREWEx.EndWrite;
+begin
+  if FLockOwner <> TThread.Current.ThreadID then
+    raise Exception.Create('Not an owner');
+
+  Dec(FLockCount);
+  if FLockCount = 0 then begin
+    FLockOwner := 0;
+    FRWLock.EndWrite;
+  end;
+end; { TLightweightMREWEx.EndWrite }
+
+function TLightweightMREWEx.TryBeginRead: boolean;
+begin
+  Result := FRWLock.TryBeginRead;
+end; { TLightweightMREWEx.TryBeginRead }
+
+{$IF defined(LINUX) or defined(ANDROID)}
+function TLightweightMREWEx.TryBeginRead(timeout: cardinal): boolean;
+begin
+  Result := FRWLock.TryBeginRead(timeout);
+end; { TLightweightMREWEx.TryBeginRead }
+{$IFEND LINUX or ANDROID}
+
+function TLightweightMREWEx.TryBeginWrite: boolean;
+begin
+  if FLockOwner = TThread.Current.ThreadID then begin
+    Inc(FLockCount);
+    Result := true;
+  end
+  else begin
+    Result := FRWLock.TryBeginWrite;
+    if Result then begin
+      FLockOwner := TThread.Current.ThreadID;
+      FLockCount := 1;
+    end;
+  end;
+end; { TLightweightMREWEx.TryBeginWrite }
+
+{$IF defined(LINUX) or defined(ANDROID)}
+function TLightweightMREWEx.TryBeginWrite(timeout: cardinal): boolean;
+begin
+  if FLockOwner = TThread.Current.ThreadID then begin
+    Inc(FLockCount);
+    Result := true;
+  end
+  else begin
+    Result := FRWLock.TryBeginWrite(timeout);
+    if Result then begin
+      FLockOwner := TThread.Current.ThreadID;
+      FLockCount := 1;
+    end;
+  end;
+end; { TLightweightMREWEx.TryBeginWrite }
+{$IFEND LINUX or ANDROID}
+{$ENDIF OTL_HasLightweightMREW}
+
 { Locked<T> }
 
 constructor Locked<T>.Create(const value: T; ownsObject: boolean);
@@ -1574,7 +1706,9 @@ begin
   if ownsObject and (PTypeInfo(TypeInfo(T))^.Kind = tkClass) then
     FLifecycle := CreateAutoDestroyObject(TObject(PPointer(@value)^));
   FInitialized := true;
+  {$IFNDEF OTL_HasLightweightMREW}
   FLock.Initialize;
+  {$ENDIF ~OTL_HasLightweightMREW}
 end; { Locked<T>.Create }
 
 class operator Locked<T>.Implicit(const value: Locked<T>): T;
@@ -1589,8 +1723,26 @@ end; { Locked<T>.Implicit }
 
 procedure Locked<T>.Acquire;
 begin
+  {$IFDEF OTL_HasLightweightMREW}
+  FLock.BeginWrite;
+  {$ELSE ~OTL_HasLightweightMREW}
   FLock.Acquire;
+  {$ENDIF ~OTL_HasLightweightMREW}
 end; { Locked<T>.Acquire }
+
+{$IFDEF OTL_HasLightweightMREW}
+function Locked<T>.BeginRead: T;
+begin
+  FLock.BeginRead;
+  Result := FValue;
+end; { Locked<T>.BeginRead }
+
+function Locked<T>.BeginWrite: T;
+begin
+  FLock.BeginWrite;
+  Result := FValue;
+end; { Locked<T>.BeginWrite }
+{$ENDIF OTL_HasLightweightMREW}
 
 procedure Locked<T>.Clear;
 begin
@@ -1599,6 +1751,25 @@ begin
   FValue := Default(T);
   FOwnsObject := false;
 end; { Locked }
+
+{$IFDEF OTL_HasLightweightMREW}
+procedure Locked<T>.EndRead;
+begin
+  FLock.EndRead;
+end; { Locked<T>.EndRead }
+
+procedure Locked<T>.EndWrite;
+begin
+  FLock.EndWrite;
+end; { Locked<T>.EndWrite }
+
+function Locked<T>.Enter: T;
+begin
+  Acquire;
+  Result := FValue;
+end; { Locked<T>.Enter }
+
+{$ENDIF OTL_HasLightweightMREW}
 
 procedure Locked<T>.Free;
 begin
@@ -1678,8 +1849,16 @@ begin
       end);
   end;
 end; { Locked<T>.Initialize }
-
 {$ENDIF OTL_ERTTI}
+
+procedure Locked<T>.Leave;
+begin
+  {$IFDEF OTL_HasLightweightMREW}
+  FLock.EndWrite;
+  {$ELSE ~OTL_HasLightweightMREW}
+  FLock.Release;
+  {$ENDIF ~OTL_HasLightweightMREW}
+end; { Locked<T>.Leave }
 
 procedure Locked<T>.Locked(proc: TProc);
 begin
@@ -1699,8 +1878,32 @@ end; { Locked<T>.Locked }
 
 procedure Locked<T>.Release;
 begin
-  FLock.Release;
+  Leave;
 end; { Locked<T>.Release }
+
+{$IFDEF OTL_HasLightweightMREW}
+function Locked<T>.TryBeginRead: boolean;
+begin
+  Result := FLock.TryBeginRead;
+end; { Locked<T>.TryBeginRead}
+
+function Locked<T>.TryBeginWrite: boolean;
+begin
+  Result := FLock.TryBeginWrite;
+end; { Locked<T>.TryBeginWrite }
+
+{$IF defined(LINUX) or defined(ANDROID)}
+function Locked<T>.TryBeginRead(timeout: cardinal): boolean;
+begin
+  Result := FLock.TryBeginRead(timeout);
+end; { Locked<T>.TryBeginRead }
+
+function Locked<T>.TryBeginWrite(timeout: cardinal): boolean; overload; inline;
+begin
+  Result := FLock.TryBeginWrite(timeout);
+end; { Locked<T>.TryBeginWrite }
+{$IFEND LINUX or ANDROID}
+{$ENDIF OTL_HasLightweightMREW}
 
 {$IFDEF MSWINDOWS}
 
