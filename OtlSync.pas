@@ -387,13 +387,16 @@ type
     FRWLock              : TLightweightMREW;
     FReadLockCount       : TOmniAlignedInt32;
     FWriteLockCount      : TOmniAlignedInt32;
-    [volatile] FLockOwner: TThreadID;
+    FLockOwner           : TThreadID;
+  private
+    function  GetLockOwner: TThreadID; inline;
+    procedure SetLockOwner(value: TThreadID); inline;
   public
     class operator Initialize(out dest: TLightweightMREWEx);
     procedure BeginRead; inline;
     function  TryBeginRead: boolean; {$IF defined(LINUX) or defined(ANDROID)}overload;{$IFEND} inline;
     {$IF defined(LINUX) or defined(ANDROID)}
-    function TryBeginRead(timeout: cardinal): boolean; overload; inline;
+    function  TryBeginRead(timeout: cardinal): boolean; overload; inline;
     {$IFEND LINUX or ANDROID}
     procedure EndRead; inline;
     procedure BeginWrite;
@@ -1650,9 +1653,29 @@ end; { Atomic<I,T>.Initialize }
 
 { TLightweightMREWEx }
 
+function TLightweightMREWEx.GetLockOwner: TThreadID;
+begin
+  {$IFDEF CPUX64}
+  Result := TThreadID(TInterlocked.Read(Int64(FLockOwner)));
+  {$ELSE}
+  Result := TThreadID(TInterlocked.Read(Integer(FLockOwner)));
+  {$ENDIF}
+  MemoryBarrier;
+end; { TLightweightMREWEx.GetLockOwner }
+
+procedure TLightweightMREWEx.SetLockOwner(value: TThreadID);
+begin
+  MemoryBarrier;
+  {$IFDEF CPUX64}
+  TInterlocked.Exchange(Int64(FLockOwner), Int64(value));
+  {$ELSE}
+  TInterlocked.Exchange(Integer(FLockOwner), Integer(value));
+  {$ENDIF}
+end; { TLightweightMREWEx.SetLockOwner }
+
 class operator TLightweightMREWEx.Initialize(out dest: TLightweightMREWEx);
 begin
-  Dest.FLockOwner := 0;
+  Dest.SetLockOwner(0);
   Dest.FReadLockCount.Value := 0;
   Dest.FWriteLockCount.Value := 0;
 end; { TLightweightMREWEx.Initialize }
@@ -1665,11 +1688,11 @@ end; { TLightweightMREWEx.BeginRead }
 
 procedure TLightweightMREWEx.BeginWrite;
 begin
-  if FLockOwner = TThread.Current.ThreadID then
+  if GetLockOwner = TThread.Current.ThreadID then
     FWriteLockCount.Increment
   else begin
     FRWLock.BeginWrite;
-    FLockOwner := TThread.Current.ThreadID;
+    SetLockOwner(TThread.Current.ThreadID);
     FWriteLockCount.Value := 1;
   end;
 end; { TLightweightMREWEx.BeginWrite }
@@ -1682,11 +1705,11 @@ end; { TLightweightMREWEx.EndRead }
 
 procedure TLightweightMREWEx.EndWrite;
 begin
-  if FLockOwner <> TThread.Current.ThreadID then
+  if GetLockOwner <> TThread.Current.ThreadID then
     raise Exception.Create('Not an owner');
 
   if FWriteLockCount.Decrement = 0 then begin
-    FLockOwner := 0;
+    SetLockOwner(0);
     FRWLock.EndWrite;
   end;
 end; { TLightweightMREWEx.EndWrite }
@@ -1714,14 +1737,14 @@ end; { TLightweightMREWEx.TryBeginRead }
 
 function TLightweightMREWEx.TryBeginWrite: boolean;
 begin
-  if FLockOwner = TThread.Current.ThreadID then begin
+  if GetLockOwner = TThread.Current.ThreadID then begin
     FWriteLockCount.Increment;
     Result := true;
   end
   else begin
     Result := FRWLock.TryBeginWrite;
     if Result then begin
-      FLockOwner := TThread.Current.ThreadID;
+      SetLockOwner(TThread.Current.ThreadID);
       FWriteLockCount.Value := 1;
     end;
   end;
@@ -1730,14 +1753,14 @@ end; { TLightweightMREWEx.TryBeginWrite }
 {$IF defined(LINUX) or defined(ANDROID)}
 function TLightweightMREWEx.TryBeginWrite(timeout: cardinal): boolean;
 begin
-  if FLockOwner = TThread.Current.ThreadID then begin
+  if GetLockOwner = TThread.Current.ThreadID then begin
     FWriteLockCount.Increment;
     Result := true;
   end
   else begin
     Result := FRWLock.TryBeginWrite(timeout);
     if Result then begin
-      FLockOwner := TThread.Current.ThreadID;
+      SetLockOwner(TThread.Current.ThreadID);
       FWriteLockCount.Value := 1;
     end;
   end;
@@ -1813,14 +1836,13 @@ procedure Locked<T>.EndWrite;
 begin
   FLock.EndWrite;
 end; { Locked<T>.EndWrite }
+{$ENDIF OTL_HasLightweightMREW}
 
 function Locked<T>.Enter: T;
 begin
   Acquire;
   Result := FValue;
 end; { Locked<T>.Enter }
-
-{$ENDIF OTL_HasLightweightMREW}
 
 procedure Locked<T>.Free;
 begin
