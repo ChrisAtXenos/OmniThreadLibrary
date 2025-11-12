@@ -7662,7 +7662,6 @@ var
     pInfo  : PSystemLogicalProcessorInfoEx;
   begin
     bufSize := 0;
-    info := nil;
     Result := DSiGetLogicalProcessorInformationEx(relationshipType, nil, bufSize);
     if (not Result) and (GetLastError = ERROR_INSUFFICIENT_BUFFER) then begin
       GetMem(buffer, bufSize);
