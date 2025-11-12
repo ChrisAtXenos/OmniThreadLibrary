@@ -37,10 +37,10 @@
 ///   Contributors      : GJ, Lee_Nover, dottor_jeckill, Sean B. Durkin, VyPu
 ///   Creation date     : 2009-03-30
 ///   Last modification : 2025-11-11
-///   Version           : 1.28
+///   Version           : 2.0
 ///</para><para>
 ///   History:
-///     1.28: 2025-11-11
+///     2.0: 2025-11-11
 ///       - Implemented TLightweightMREWEx extension to TLightweightMREW (Delphi 11+ only).
 ///         This class adds support for nested BeginWrite/EndWrite calls.
 ///         See https://www.thedelphigeek.com/2021/02/readers-writ-47358-48721-45511-46172.html
@@ -482,10 +482,10 @@ type
     {$ENDIF OTL_ERTTI}
     procedure Acquire; inline;   // acquires Write SRW lock on Delphi 11+, critical section lock on previous versions
     function  Enter: T; inline;  // acquires Write SRW lock on Delphi 11+, critical section lock on previous versions
-    procedure Leave; inline;
+    procedure Leave; inline;     // releases Write SRW lock on Delphi 11+, critical section lock on previous versions
     procedure Locked(proc: TProc); overload; inline;
     procedure Locked(proc: TProcT); overload; inline;
-    procedure Release; inline;
+    procedure Release; inline;   // alias for Release
 
     {$IFDEF OTL_HasLightweightMREW}
     function  BeginRead: T; inline;
@@ -1660,6 +1660,9 @@ end; { Atomic<I,T>.Initialize }
 
 function TLightweightMREWEx.GetLockOwner: TThreadID;
 begin
+  {$IFDEF DEBUG}
+  Assert(SizeOf(FLockOwner) = 4, 'TThreadID is no longer an integer');
+  {$ENDIF DEBUG}
   {$IFDEF MSWINDOWS}
   Result := InterlockedCompareExchange(integer(FLockOwner), 0, 0);
   {$ELSE}
@@ -1669,6 +1672,9 @@ end; { TLightweightMREWEx.GetLockOwner }
 
 procedure TLightweightMREWEx.SetLockOwner(value: TThreadID);
 begin
+  {$IFDEF DEBUG}
+  Assert(SizeOf(FLockOwner) = 4, 'TThreadID is no longer an integer');
+  {$ENDIF DEBUG}
   {$IFDEF MSWINDOWS}
   InterlockedExchange(integer(FLockOwner), integer(value));
   {$ELSE}
@@ -1711,6 +1717,7 @@ begin
   if GetLockOwner <> TThread.Current.ThreadID then
     raise Exception.Create('Not an owner');
 
+  Assert(FWriteLockCount.Value >= 0, 'Write lock count is negative');
   if FWriteLockCount.Decrement = 0 then begin
     SetLockOwner(0);
     FRWLock.EndWrite;
