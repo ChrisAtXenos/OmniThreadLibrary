@@ -52,7 +52,7 @@
 ///       - Added methods BeginRead, TryBeginRead, EndRead, BeginWrite,
 ///         TryBeginWrite, EndWrite to Locked<T> (Delphi 11+ only).
 ///       - Locked<T>.Access/Release now implement locking with a
-///         SRW lock (when available) in 'write' access mode. This is funcionally
+///         SRW lock (when available) in 'write' access mode. This is functionally
 ///         identical to the old implementation (critical section).
 ///     1.27d: 2023-11-28
 ///       - Fixed hints & warnings.
@@ -456,6 +456,10 @@ type
 
   Locked<T> = record
   strict private // keep those aligned!
+    // FLock and FLockCount must be interfaces.
+    // If an instance of Locked<T> is access via property, it will bo copied.
+    // If FLock or FLockCount would be non-referenced objects, this copying
+    // would break the connection between the original Locked<T> and its copy.
     FLock     : {$IFDEF OTL_HasLightweightMREW}ILightweightMREWEx{$ELSE}TOmniCS{$ENDIF};
     {$IFDEF DEBUG}
     FLockCount: IOmniCounter;
@@ -1661,7 +1665,7 @@ end; { Atomic<I,T>.Initialize }
 function TLightweightMREWEx.GetLockOwner: TThreadID; //inline
 begin
   {$IFDEF DEBUG}
-  Assert(SizeOf(FLockOwner) = 4, 'TThreadID is no longer an integer');
+  Assert(SizeOf(FLockOwner) = SizeOf(integer), 'TThreadID is no longer an integer');
   {$ENDIF DEBUG}
   {$IFDEF MSWINDOWS}
   Result := InterlockedCompareExchange(integer(FLockOwner), 0, 0);
@@ -1673,7 +1677,7 @@ end; { TLightweightMREWEx.GetLockOwner }
 procedure TLightweightMREWEx.SetLockOwner(value: TThreadID); //inline
 begin
   {$IFDEF DEBUG}
-  Assert(SizeOf(FLockOwner) = 4, 'TThreadID is no longer an integer');
+  Assert(SizeOf(FLockOwner) = SizeOf(integer), 'TThreadID is no longer an integer');
   {$ENDIF DEBUG}
   {$IFDEF MSWINDOWS}
   InterlockedExchange(integer(FLockOwner), integer(value));
