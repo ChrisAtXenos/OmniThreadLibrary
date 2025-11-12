@@ -42,6 +42,7 @@
 ///   History:
 ///     1.28: 2025-11-11
 ///       - Implemented TLightweightMREWEx extension to TLightweightMREW (Delphi 11+ only).
+///         This class adds support for nested BeginWrite/EndWrite calls.
 ///         See https://www.thedelphigeek.com/2021/02/readers-writ-47358-48721-45511-46172.html
 ///         for more information.
 ///       - Implemented interface ILightweightMREWEx with the same public
