@@ -120,8 +120,12 @@
   {$DEFINE OTL_MobileSupport}
 {$IFEND}
 
-{$IF CompilerVersion >= 30} //Seattle
+{$IF CompilerVersion >= 30} //10 Seattle
   {$DEFINE OTL_CanInlineOperators}
+{$IFEND}
+
+{$IF CompilerVersion >= 35} //11 Alexandria
+  {$DEFINE OTL_HasLightweightMREW}
 {$IFEND}
 
 {$IFNDEF MSWINDOWS}
