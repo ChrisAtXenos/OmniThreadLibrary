@@ -5907,13 +5907,13 @@ type
       Exit(0);
 
     Result := 0;
-    for iProcInfo := High(info) downto 0 do begin
+    for iProcInfo := High(info) downto 0 do begin // get bits in correct order
       bit := 0;
       if info[iProcInfo].Processor.EfficiencyClass = 0 then
         bit := 1;
-      if info[iProcInfo].Processor.Flags = 0 then
+      if info[iProcInfo].Processor.Flags = 0 then // normal core
         Result := Result SHL 1 OR bit
-      else
+      else // hyperthreaded core
         Result := (Result SHL 1 OR bit) SHL 1 OR bit;
     end;
   end; { DSiGetSystemECoreAffinityMask }
@@ -5937,7 +5937,7 @@ type
       Exit(DSiGetSystemAffinityMask);
 
     Result := 0;
-    for iProcInfo := High(info) downto 0 do begin
+    for iProcInfo := High(info) downto 0 do begin // get bits in correct order
       bit := 0;
       if info[iProcInfo].Processor.EfficiencyClass > 0 then
         bit := 1;
@@ -7663,7 +7663,7 @@ var
   begin
     bufSize := 0;
     Result := DSiGetLogicalProcessorInformationEx(relationshipType, nil, bufSize);
-    if GetLastError = ERROR_INSUFFICIENT_BUFFER then begin
+    if (not Result) and (GetLastError = ERROR_INSUFFICIENT_BUFFER) then begin
       GetMem(buffer, bufSize);
       try
         Result := DSiGetLogicalProcessorInformationEx(relationshipType, buffer, bufSize);
@@ -7682,7 +7682,7 @@ var
                   SetLength(pInfo.Processor.GroupMask, pInfo.Processor.GroupCount);
                   {$R-}
                   for iGroup := 0 to High(pInfo.Processor.GroupMask) do
-                    pInfo.Processor.GroupMask[iGroup] := pInfo.Processor.GroupMask[iGroup];
+                    pInfo.Processor.GroupMask[iGroup] := pBuffer.Processor.GroupMask[iGroup];
                   {$IFDEF RestoreR}{$R+}{$ENDIF}
                 end;
               RelationNumaNode, RelationNumaNodeEx:
