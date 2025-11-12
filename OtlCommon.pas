@@ -39,6 +39,8 @@
 ///   Version           : 1.55a
 ///</para><para>
 ///   History:
+///     1.55b: 2025-11-12
+///       - Fixed TOmniEnvironment.LoadNUMAInfo.
 ///     1.55a: 2025-08-21
 ///       - Fixed TOmniGroupAffinity.Create with 64 processors on 64-bit.
 ///     1.55: 2025-07-08
@@ -4358,47 +4360,36 @@ end; { TOmniEnvironment.GetThread }
 procedure TOmniEnvironment.LoadNUMAInfo;
 {$IFDEF MSWindows}
 var
-  bufLen                 : DWORD;
-  currentInfo            : PSystemLogicalProcessorInformationEx;
   iGroup                 : integer;
+  iInfo                  : integer;
   numaNodesInternal      : IOmniNUMANodesInternal;
   pGroupInfo             : PProcessorGroupInfo;
   processorGroupsInternal: IOmniProcessorGroupsInternal;
-  procInfo               : PSystemLogicalProcessorInformationEx;
+  procInfo               : TSystemLogicalProcessorInformationExArr;
 {$ENDIF}
 begin
   {$IFNDEF MSWindows}
   CreateFakeNUMAInfo;
   {$ELSE}
-  bufLen := 0;
-  DSiGetLogicalProcessorInformationEx(DSiWin32._LOGICAL_PROCESSOR_RELATIONSHIP.RelationAll, nil, bufLen);
+  DSiGetLogicalProcessorInfoEx(DSiWin32._LOGICAL_PROCESSOR_RELATIONSHIP.RelationAll, procInfo);
   if GetLastError = ERROR_NOT_SUPPORTED then
     CreateFakeNUMAInfo
   else begin
-    if GetLastError <> ERROR_INSUFFICIENT_BUFFER then
-      raise Exception.CreateFmt('TOmniEnvironment.LoadNUMAInfo: DSiGetLogicalProcessorInformation[1] failed with [%d] %s', [GetLastError, SysErrorMessage(GetLastError)]);
-    GetMem(procInfo, bufLen);
-    try
-      if not DSiGetLogicalProcessorInformationEx(DSiWin32._LOGICAL_PROCESSOR_RELATIONSHIP.RelationAll, DSiWin32.PSYSTEM_LOGICAL_PROCESSOR_INFORMATION(procInfo), bufLen) then
-        raise Exception.CreateFmt('TOmniEnvironment.LoadNUMAInfo: DSiGetLogicalProcessorInformation[2] failed with [%d] %s', [GetLastError, SysErrorMessage(GetLastError)]);
-      numaNodesInternal := (oeNUMANodes as IOmniNUMANodesInternal);
-      processorGroupsInternal := (oeProcessorGroups as IOmniProcessorGroupsInternal);
-      currentInfo := procInfo;
-      while (NativeUInt(currentInfo) - NativeUInt(procInfo)) < bufLen do begin
-        if DSiWin32._LOGICAL_PROCESSOR_RELATIONSHIP(currentInfo.Relationship) = DSiWin32._LOGICAL_PROCESSOR_RELATIONSHIP.RelationNumaNode then
-          numaNodesInternal.Add(TOmniNUMANode.Create(currentInfo.NumaNode.NodeNumber,
-            currentInfo.NumaNode.GroupMask.Group, currentInfo.NumaNode.GroupMask.Mask))
-        else if DSiWin32._LOGICAL_PROCESSOR_RELATIONSHIP(currentInfo.Relationship) = DSiWin32._LOGICAL_PROCESSOR_RELATIONSHIP.RelationGroup then begin
-          pGroupInfo := @currentInfo.Group.GroupInfo;
-          for iGroup := 0 to currentInfo.Group.ActiveGroupCount - 1 do begin
-            processorGroupsInternal.Add(TOmniProcessorGroup.Create(iGroup, pGroupInfo^.ActiveProcessorMask));
-            Inc(pGroupInfo);
-          end;
+    numaNodesInternal := (oeNUMANodes as IOmniNUMANodesInternal);
+    processorGroupsInternal := (oeProcessorGroups as IOmniProcessorGroupsInternal);
+    for iInfo := Low(procInfo) to High(procInfo) do begin
+      if DSiWin32._LOGICAL_PROCESSOR_RELATIONSHIP(procInfo[iInfo].Relationship) = DSiWin32._LOGICAL_PROCESSOR_RELATIONSHIP.RelationNumaNode then
+        numaNodesInternal.Add(TOmniNUMANode.Create(procInfo[iInfo].NumaNode.NodeNumber,
+          procInfo[iInfo].NumaNode.GroupMask.Group, procInfo[iInfo].NumaNode.GroupMask.Mask))
+      else if DSiWin32._LOGICAL_PROCESSOR_RELATIONSHIP(procInfo[iInfo].Relationship) = DSiWin32._LOGICAL_PROCESSOR_RELATIONSHIP.RelationGroup then begin
+        pGroupInfo := @procInfo[iInfo].Group.GroupInfo;
+        for iGroup := 0 to procInfo[iInfo].Group.ActiveGroupCount - 1 do begin
+          processorGroupsInternal.Add(TOmniProcessorGroup.Create(iGroup, pGroupInfo^.ActiveProcessorMask));
+          Inc(pGroupInfo);
         end;
-        currentInfo := PSystemLogicalProcessorInformationEx(NativeUInt(currentInfo) + currentInfo.Size);
       end;
-      numaNodesInternal.Sort;
-    finally FreeMem(procInfo); end;
+    end;
+    numaNodesInternal.Sort;
   end;
   {$ENDIF MSWindows}
 end; { TOmniEnvironment.LoadNUMAInfo }

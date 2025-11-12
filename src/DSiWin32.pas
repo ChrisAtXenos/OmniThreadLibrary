@@ -8,10 +8,16 @@
                        Christian Wimmer, Tommi Prami, Miha, Craig Peterson, Tommaso Ercole,
                        bero.
    Creation date     : 2002-10-09
-   Last modification : 2024-08-28
-   Version           : 2.09
+   Last modification : 2025-11-05
+   Version           : 2.11
 </pre>*)(*
    History:
+     2.11: 2025-11-05
+       - Fixed DSiGetLogicalProcessorInformationEx.
+       - Implemented DSiGetLogicalProcessorInfoEx.
+       - Added new relationships to _LOGICAL_PROCESSOR_RELATIONSHIP.
+       - Added functions DSiGetSystemECoreAffinity, DSiGetSystemECoreAffinityMask,
+         DSiGetSystemPCoreAffinity, DSiGetSystemPCoreAffinityMask.
      2.10: 2025-05-06
        - *** BREAKING CHANGE *** Renamed time functions that are based on
          GetTickCount from DSiElapsedSince, DSiElapsedTime, and DSiHasElapsed 
@@ -1472,6 +1478,10 @@ type
     var userTime, kernelTime: int64): boolean; overload;
   function  DSiGetSystemAffinity: string;
   function  DSiGetSystemAffinityMask: DSiNativeUInt;
+  function  DSiGetSystemECoreAffinity: string;
+  function  DSiGetSystemECoreAffinityMask: DSiNativeUInt;
+  function  DSiGetSystemPCoreAffinity: string;
+  function  DSiGetSystemPCoreAffinityMask: DSiNativeUInt;
   function  DSiGetThreadAffinity: string;
   function  DSiGetThreadAffinityMask: DSiNativeUInt;
   function  DSiGetThreadContext(thread: THandle; var context: TContext;
@@ -1709,7 +1719,8 @@ type
   TStartupInfoA = TStartupInfo;
   {$ENDIF DSiNeedStartupInfo}
 
-  _LOGICAL_PROCESSOR_RELATIONSHIP = (RelationProcessorCore{ = 0}, RelationNumaNode{ = 1}, RelationCache{ = 2}, RelationProcessorPackage{ = 3}, RelationGroup{ = 4}, RelationAll = $FFFF);
+  _LOGICAL_PROCESSOR_RELATIONSHIP = (RelationProcessorCore{ = 0}, RelationNumaNode{ = 1}, RelationCache{ = 2}, RelationProcessorPackage{ = 3}, RelationGroup{ = 4},
+    RelationProcessorDie{ = 5}, RelationNumaNodeEx{ = 6}, RelationProcessorModule{ = 7}, RelationAll = $FFFF);
   {$EXTERNALSYM _LOGICAL_PROCESSOR_RELATIONSHIP}
   LOGICAL_PROCESSOR_RELATIONSHIP = _LOGICAL_PROCESSOR_RELATIONSHIP;
   {$EXTERNALSYM LOGICAL_PROCESSOR_RELATIONSHIP}
@@ -1753,6 +1764,133 @@ type
   TSystemLogicalProcessorInformation = SYSTEM_LOGICAL_PROCESSOR_INFORMATION;
   PSystemLogicalProcessorInformation = PSYSTEM_LOGICAL_PROCESSOR_INFORMATION;
   TSystemLogicalProcessorInformationArr = array of TSystemLogicalProcessorInformation;
+
+  KAFFINITY = ULONG_PTR;
+  {$EXTERNALSYM KAFFINITY}
+  PKAFFINITY = ^ULONG_PTR;
+  {$EXTERNALSYM PKAFFINITY}
+  TKAffinity = KAFFINITY;
+
+  _GROUP_AFFINITY = record
+      Mask: KAFFINITY;
+      Group: WORD;
+      Reserved: array[0..2] of WORD;
+  end;
+  {$EXTERNALSYM _GROUP_AFFINITY}
+  GROUP_AFFINITY = _GROUP_AFFINITY;
+  {$EXTERNALSYM GROUP_AFFINITY}
+  PGROUP_AFFINITY = ^_GROUP_AFFINITY;
+  {$EXTERNALSYM PGROUP_AFFINITY}
+  TGroupAffinity = _GROUP_AFFINITY;
+  PGroupAffinity = PGROUP_AFFINITY;
+
+  _PROCESSOR_RELATIONSHIP = record
+    Flags: BYTE;
+    EfficiencyClass: BYTE;
+    Reserved: array[1..20] of BYTE;
+    GroupCount: WORD;
+    GroupMask: array[0..0] of GROUP_AFFINITY;
+  end;
+  {$EXTERNALSYM _PROCESSOR_RELATIONSHIP}
+  PROCESSOR_RELATIONSHIP = _PROCESSOR_RELATIONSHIP;
+  {$EXTERNALSYM PROCESSOR_RELATIONSHIP}
+  PPROCESSOR_RELATIONSHIP = ^_PROCESSOR_RELATIONSHIP;
+  {$EXTERNALSYM PPROCESSOR_RELATIONSHIP}
+  TProcessorRelationship = _PROCESSOR_RELATIONSHIP;
+  PProcessorRelationship = PPROCESSOR_RELATIONSHIP;
+
+  _NUMA_NODE_RELATIONSHIP = record
+    NodeNumber: DWORD;
+    Reserved: array[0..17] of BYTE;
+    GroupMask: GROUP_AFFINITY;
+  end;
+  {$EXTERNALSYM _NUMA_NODE_RELATIONSHIP}
+  NUMA_NODE_RELATIONSHIP = _NUMA_NODE_RELATIONSHIP;
+  {$EXTERNALSYM NUMA_NODE_RELATIONSHIP}
+  PNUMA_NODE_RELATIONSHIP = ^_NUMA_NODE_RELATIONSHIP;
+  {$EXTERNALSYM PNUMA_NODE_RELATIONSHIP}
+  TNumaNodeRelationship = _NUMA_NODE_RELATIONSHIP;
+  PNumaNodeRelationship = PNUMA_NODE_RELATIONSHIP;
+
+  _CACHE_RELATIONSHIP = record
+    Level: BYTE;
+    Associativity: BYTE;
+    LineSize: WORD;
+    CacheSize: DWORD;
+    _Type: PROCESSOR_CACHE_TYPE;
+    Reserved: array[0..17] of BYTE;
+    GroupMask: GROUP_AFFINITY;
+  end;
+  {$EXTERNALSYM _CACHE_RELATIONSHIP}
+  CACHE_RELATIONSHIP = _CACHE_RELATIONSHIP;
+  {$EXTERNALSYM CACHE_RELATIONSHIP}
+  PCACHE_RELATIONSHIP = ^_CACHE_RELATIONSHIP;
+  {$EXTERNALSYM PCACHE_RELATIONSHIP}
+  TCacheRelationship = _CACHE_RELATIONSHIP;
+  PCacheRelationship = PCACHE_RELATIONSHIP;
+
+  _PROCESSOR_GROUP_INFO = record
+    MaximumProcessorCount: BYTE;
+    ActiveProcessorCount: BYTE;
+    Reserved: array[0..37] of BYTE;
+    ActiveProcessorMask: KAFFINITY;
+  end;
+  {$EXTERNALSYM _PROCESSOR_GROUP_INFO}
+  PROCESSOR_GROUP_INFO = _PROCESSOR_GROUP_INFO;
+  {$EXTERNALSYM PROCESSOR_GROUP_INFO}
+  PPROCESSOR_GROUP_INFO = ^_PROCESSOR_GROUP_INFO;
+  {$EXTERNALSYM PPROCESSOR_GROUP_INFO}
+  TProcessorGroupInfo = _PROCESSOR_GROUP_INFO;
+  PProcessorGroupInfo = PPROCESSOR_GROUP_INFO;
+
+  _GROUP_RELATIONSHIP = record
+    MaximumGroupCount: WORD;
+    ActiveGroupCount: WORD;
+    Reserved: array[0..19] of BYTE;
+    GroupInfo: array[0..0] of PROCESSOR_GROUP_INFO;
+  end;
+  {$EXTERNALSYM _GROUP_RELATIONSHIP}
+  GROUP_RELATIONSHIP = _GROUP_RELATIONSHIP;
+  {$EXTERNALSYM GROUP_RELATIONSHIP}
+  PGROUP_RELATIONSHIP = ^_GROUP_RELATIONSHIP;
+  {$EXTERNALSYM PGROUP_RELATIONSHIP}
+  TGroupRelationship = _GROUP_RELATIONSHIP;
+  PGroupRelationship = PGROUP_RELATIONSHIP;
+
+  _SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX = record
+    Relationship: LOGICAL_PROCESSOR_RELATIONSHIP;
+    Size: DWORD;
+    case Integer of
+      0: (Processor: PROCESSOR_RELATIONSHIP);
+      1: (NumaNode: NUMA_NODE_RELATIONSHIP);
+      2: (Cache: CACHE_RELATIONSHIP);
+      3: (Group: GROUP_RELATIONSHIP);
+  end;
+  {$EXTERNALSYM _SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX}
+  SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX = _SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
+  {$EXTERNALSYM SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX}
+  PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX = ^_SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
+  {$EXTERNALSYM PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX}
+  TSystemLogicalProcessorInformationEx = _SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
+  PSystemLogicalProcessorInformationEx = PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
+
+  TProcessorRelationshipEx = record
+    Flags: byte;
+    EfficiencyClass: byte;
+    GroupCount: word;
+    GroupMask: array of GROUP_AFFINITY;
+  end;
+
+  TSystemLogicalProcessorInfoEx = record
+    Relationship: LOGICAL_PROCESSOR_RELATIONSHIP;
+    Processor: TProcessorRelationshipEx;
+    NumaNode: NUMA_NODE_RELATIONSHIP;
+    Cache: CACHE_RELATIONSHIP;
+    Group: GROUP_RELATIONSHIP;
+  end;
+  PSystemLogicalProcessorInfoEx = ^TSystemLogicalProcessorInfoEx;
+
+  TSystemLogicalProcessorInformationExArr = array of TSystemLogicalProcessorInfoEx;
 
 {$IFNDEF DSiHasGroupAffinity}
   KAFFINITY = ULONG_PTR;
@@ -1935,6 +2073,8 @@ type
   function  DSiGetFolderLocation(const CSIDL: integer): string;
   procedure DSiGetKeyboardLayouts(layouts: TStrings);
   function  DSiGetLogicalProcessorInfo(var info: TSystemLogicalProcessorInformationArr): boolean;
+  function  DSiGetLogicalProcessorInfoEx(relationshipType: TLogicalProcessorRelationship;
+    var info: TSystemLogicalProcessorInformationExArr): boolean;
   function  DSiGetMyDocumentsFolder: string;
   function  DSiGetProgramFilesFolder: string;
   function  DSiGetRegisteredOwner: string;
@@ -2189,7 +2329,7 @@ type
     var ReturnLength: DWORD): BOOL; stdcall;
   function  DSiGetLogicalProcessorInformationEx(
     RelationshipType: LOGICAL_PROCESSOR_RELATIONSHIP;
-    Buffer: PSYSTEM_LOGICAL_PROCESSOR_INFORMATION;
+    Buffer: PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
     var ReturnedLength: DWORD): BOOL; stdcall;
   function  DSiGetModuleFileNameEx(hProcess: THandle; hModule: HMODULE; lpFilename: PChar;
     nSize: DWORD): DWORD; stdcall;
@@ -2359,7 +2499,7 @@ type
     var ReturnLength: DWORD): BOOL; stdcall;
   TGetLogicalProcessorInformationEx = function(
     RelationshipType: LOGICAL_PROCESSOR_RELATIONSHIP;
-    Buffer: PSYSTEM_LOGICAL_PROCESSOR_INFORMATION;
+    Buffer: PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
     var ReturnedLength: DWORD): BOOL; stdcall;
   TGetModuleFileNameEx = function(hProcess: THandle; hModule: HMODULE; lpFilename: PChar;
     nSize: DWORD): DWORD; stdcall;
@@ -5748,6 +5888,69 @@ type
       GetProcessAffinityMask(GetCurrentProcess, processAffinityMask, Result);
   end; { TDSiRegistry.DSiGetSystemAffinityMask }
 
+  {:Returns affinity mask of efficency cores as a list of CPU IDs (0..9, A..V).
+  }
+  function DSiGetSystemECoreAffinity: string;
+  begin
+    Result := DSiAffinityMaskToString(DSiGetSystemECoreAffinityMask);
+  end; { DSiGetSystemECoreAffinity }
+
+  {:Returns affinity mask of efficency cores as a bitmask.
+  }
+  function  DSiGetSystemECoreAffinityMask: DSiNativeUInt;
+  var
+    bit      : integer;
+    info     : TSystemLogicalProcessorInformationExArr;
+    iProcInfo: integer;
+  begin
+    if not DSiGetLogicalProcessorInfoEx(RelationProcessorCore, info) then
+      Exit(0);
+
+    Result := 0;
+    for iProcInfo := High(info) downto 0 do begin // get bits in correct order
+      bit := 0;
+      if info[iProcInfo].Processor.EfficiencyClass = 0 then
+        bit := 1;
+      if info[iProcInfo].Processor.Flags = 0 then // normal core
+        Result := Result SHL 1 OR bit
+      else // hyperthreaded core
+        Result := (Result SHL 1 OR bit) SHL 1 OR bit;
+    end;
+  end; { DSiGetSystemECoreAffinityMask }
+
+  {:Returns affinity mask of performance cores as a list of CPU IDs (0..9, A..V).
+  }
+  function  DSiGetSystemPCoreAffinity: string;
+  begin
+    Result := DSiAffinityMaskToString(DSiGetSystemPCoreAffinityMask);
+  end; { DSiGetSystemPCoreAffinity }
+
+  {:Returns affinity mask of performance cores as a bitmask.
+  }
+  function  DSiGetSystemPCoreAffinityMask: DSiNativeUInt;
+  var
+    bit      : integer;
+    info     : TSystemLogicalProcessorInformationExArr;
+    iProcInfo: integer;
+  begin
+    if not DSiGetLogicalProcessorInfoEx(RelationProcessorCore, info) then
+      Exit(DSiGetSystemAffinityMask);
+
+    Result := 0;
+    for iProcInfo := High(info) downto 0 do begin // get bits in correct order
+      bit := 0;
+      if info[iProcInfo].Processor.EfficiencyClass > 0 then
+        bit := 1;
+      if info[iProcInfo].Processor.Flags = 0 then
+        Result := Result SHL 1 OR bit
+      else
+        Result := (Result SHL 1 OR bit) SHL 1 OR bit;
+    end;
+
+    if Result = 0 then // all EfficiencyClass = 0 => CPU without E-cores
+      Result := DSiGetSystemAffinityMask;
+  end; { DSiGetSystemPCoreAffinityMask }
+
   {:Retrieves affinity mask of the current thread as a list of CPU IDs (0..9,
     A..V).
     @author  gabr
@@ -7429,6 +7632,8 @@ var
     end;
   end; { DSiGetKeyboardLayouts }
 
+  {:Wrapper for DSiGetLogicalProcessorInformation.
+  }
   function DSiGetLogicalProcessorInfo(
     var info: TSystemLogicalProcessorInformationArr): boolean;
   var
@@ -7444,6 +7649,57 @@ var
     if not Result then
       SetLength(info, 0);
   end; { DSiGetLogicalProcessorInfo }
+
+  {:Wrapper for DSiGetLogicalProcessorInformationEx.
+  }
+  function DSiGetLogicalProcessorInfoEx(relationshipType: TLogicalProcessorRelationship;
+    var info: TSystemLogicalProcessorInformationExArr): boolean;
+  var
+    buffer : pointer;
+    bufSize: DWORD;
+    iGroup : integer;
+    pBuffer: PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
+    pInfo  : PSystemLogicalProcessorInfoEx;
+  begin
+    bufSize := 0;
+    Result := DSiGetLogicalProcessorInformationEx(relationshipType, nil, bufSize);
+    if (not Result) and (GetLastError = ERROR_INSUFFICIENT_BUFFER) then begin
+      GetMem(buffer, bufSize);
+      try
+        Result := DSiGetLogicalProcessorInformationEx(relationshipType, buffer, bufSize);
+        if Result then begin
+          pBuffer := buffer;
+          repeat
+            SetLength(info, Length(info) + 1);
+            pInfo := @info[Length(info)-1];
+            pInfo.Relationship := pBuffer.Relationship;
+            case pInfo.Relationship of
+              RelationProcessorCore, RelationProcessorDie, RelationProcessorModule, RelationProcessorPackage:
+                begin
+                  pInfo.Processor.Flags := pBuffer.Processor.Flags;
+                  pInfo.Processor.EfficiencyClass := pBuffer.Processor.EfficiencyClass;
+                  pInfo.Processor.GroupCount := pBuffer.Processor.GroupCount;
+                  SetLength(pInfo.Processor.GroupMask, pInfo.Processor.GroupCount);
+                  {$R-}
+                  for iGroup := 0 to High(pInfo.Processor.GroupMask) do
+                    pInfo.Processor.GroupMask[iGroup] := pBuffer.Processor.GroupMask[iGroup];
+                  {$IFDEF RestoreR}{$R+}{$ENDIF}
+                end;
+              RelationNumaNode, RelationNumaNodeEx:
+                Move(pBuffer.NumaNode, pInfo.NumaNode, SizeOf(NUMA_NODE_RELATIONSHIP));
+              RelationCache:
+                Move(pBuffer.Cache, pInfo.Cache, SizeOf(CACHE_RELATIONSHIP));
+              RelationGroup:
+                Move(pBuffer.Group, pInfo.Group, SizeOf(GROUP_RELATIONSHIP));
+            end;
+            pBuffer := pointer(DSiNativeUInt(pBuffer) + pBuffer.Size);
+          until (DSiNativeUInt(pBuffer) - DSiNativeUInt(buffer)) >= bufSize;
+        end;
+      finally FreeMem(buffer); end;
+    end;
+    if not Result then
+      SetLength(info, 0);
+  end; { DSiGetLogicalProcessorInfoEx }
 
   {:Returns My Documents folder.
     @author  xtreme
@@ -9346,7 +9602,7 @@ var
 
   function DSiGetLogicalProcessorInformationEx(
     RelationshipType: LOGICAL_PROCESSOR_RELATIONSHIP;
-    Buffer: PSYSTEM_LOGICAL_PROCESSOR_INFORMATION;
+    Buffer: PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
     var ReturnedLength: DWORD): BOOL;
   begin
     if not assigned(GGetLogicalProcessorInformationEx) then
