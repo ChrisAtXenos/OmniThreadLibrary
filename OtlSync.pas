@@ -481,11 +481,11 @@ type
     function  Initialize: T; overload;
     {$ENDIF OTL_ERTTI}
     procedure Acquire; inline;   // acquires Write SRW lock on Delphi 11+, critical section lock on previous versions
+    procedure Release; inline;   // releases Write SRW lock on Delphi 11+, critical section lock on previous versions
     function  Enter: T; inline;  // acquires Write SRW lock on Delphi 11+, critical section lock on previous versions
     procedure Leave; inline;     // releases Write SRW lock on Delphi 11+, critical section lock on previous versions
     procedure Locked(proc: TProc); overload; inline;
     procedure Locked(proc: TProcT); overload; inline;
-    procedure Release; inline;   // alias for Release
 
     {$IFDEF OTL_HasLightweightMREW}
     function  BeginRead: T; inline;
@@ -1658,7 +1658,7 @@ end; { Atomic<I,T>.Initialize }
 
 { TLightweightMREWEx }
 
-function TLightweightMREWEx.GetLockOwner: TThreadID;
+function TLightweightMREWEx.GetLockOwner: TThreadID; //inline
 begin
   {$IFDEF DEBUG}
   Assert(SizeOf(FLockOwner) = 4, 'TThreadID is no longer an integer');
@@ -1670,7 +1670,7 @@ begin
   {$ENDIF ~MSWINDOWS}
 end; { TLightweightMREWEx.GetLockOwner }
 
-procedure TLightweightMREWEx.SetLockOwner(value: TThreadID);
+procedure TLightweightMREWEx.SetLockOwner(value: TThreadID); //inline
 begin
   {$IFDEF DEBUG}
   Assert(SizeOf(FLockOwner) = 4, 'TThreadID is no longer an integer');
@@ -1717,7 +1717,8 @@ begin
   if GetLockOwner <> TThread.Current.ThreadID then
     raise Exception.Create('Not an owner');
 
-  Assert(FWriteLockCount.Value >= 0, 'Write lock count is negative');
+  if FWriteLockCount.Value <= 0 then
+    raise Exception.Create('Attempting to release write lock that was not acquired');
   if FWriteLockCount.Decrement = 0 then begin
     SetLockOwner(0);
     FRWLock.EndWrite;
