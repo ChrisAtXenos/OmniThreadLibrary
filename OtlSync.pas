@@ -480,8 +480,8 @@ type
     {$IFDEF OTL_ERTTI}
     function  Initialize: T; overload;
     {$ENDIF OTL_ERTTI}
-    procedure Acquire; inline;
-    function  Enter: T; inline;
+    procedure Acquire; inline;   // acquires Write SRW lock on Delphi 11+, critical section lock on previous versions
+    function  Enter: T; inline;  // acquires Write SRW lock on Delphi 11+, critical section lock on previous versions
     procedure Leave; inline;
     procedure Locked(proc: TProc); overload; inline;
     procedure Locked(proc: TProcT); overload; inline;
@@ -1669,7 +1669,11 @@ end; { TLightweightMREWEx.GetLockOwner }
 
 procedure TLightweightMREWEx.SetLockOwner(value: TThreadID);
 begin
-  Assert(CAS32(FLockOwner, value, FLockOwner), 'Failed to set new lock owner - check for race conditions!');
+  {$IFDEF MSWINDOWS}
+  InterlockedExchange(integer(FLockOwner), integer(value));
+  {$ELSE}
+  TInterlocked.Exchange(FLockOwner, value);
+  {$ENDIF}
 end; { TLightweightMREWEx.SetLockOwner }
 
 class operator TLightweightMREWEx.Initialize(out dest: TLightweightMREWEx);
@@ -1722,8 +1726,6 @@ end; { TLightweightMREWEx.TryBeginRead }
 function TLightweightMREWEx.TryBeginRead(timeout: cardinal): boolean;
 begin
   Result := FRWLock.TryBeginRead(timeout);
-  if Result then
-    FReadLockCount.Increment;
 end; { TLightweightMREWEx.TryBeginRead }
 {$IFEND LINUX or ANDROID}
 
@@ -1769,7 +1771,9 @@ begin
   {$ELSE ~OTL_HasLightweightMREW}
   FLock.Initialize;
   {$ENDIF ~OTL_HasLightweightMREW}
+  {$IFDEF DEBUG}
   FLockCount := CreateCounter;
+  {$ENDIF DEBUG}
 
   Clear;
   FValue := value;
@@ -1912,7 +1916,9 @@ begin
     {$ELSE ~OTL_HasLightweightMREW}
     FLock.Initialize;
     {$ENDIF ~OTL_HasLightweightMREW}
+    {$IFDEF DEBUG}
     FLockCount := CreateCounter;
+    {$ENDIF DEBUG}
 
     Acquire;
     try
