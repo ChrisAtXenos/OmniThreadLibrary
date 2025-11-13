@@ -5899,7 +5899,7 @@ type
   }
   function  DSiGetSystemECoreAffinityMask: DSiNativeUInt;
   var
-    bit      : integer;
+    bit      : DSiNativeUInt;
     info     : TSystemLogicalProcessorInformationExArr;
     iProcInfo: integer;
   begin
@@ -5929,7 +5929,7 @@ type
   }
   function  DSiGetSystemPCoreAffinityMask: DSiNativeUInt;
   var
-    bit      : integer;
+    bit      : DSiNativeUInt;
     info     : TSystemLogicalProcessorInformationExArr;
     iProcInfo: integer;
   begin
