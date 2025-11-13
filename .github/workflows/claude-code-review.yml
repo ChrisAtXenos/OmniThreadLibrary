@@ -8,7 +8,7 @@ on:
     #   - "src/**/*.ts"
     #   - "src/**/*.tsx"
     #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+    #   - "src/**/*.jsx"    
 
 jobs:
   claude-review:
