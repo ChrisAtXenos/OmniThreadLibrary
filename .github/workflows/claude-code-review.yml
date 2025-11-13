@@ -8,7 +8,9 @@ on:
     #   - "src/**/*.ts"
     #   - "src/**/*.tsx"
     #   - "src/**/*.js"
-    #   - "src/**/*.jsx"    
+    #   - "src/**/*.jsx"
+  pull_request_target:
+    types: [opened, synchronize, reopened]        
 
 jobs:
   claude-review:
