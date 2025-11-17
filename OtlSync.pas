@@ -470,7 +470,6 @@ type
     FLifecycle  : IInterface;
     FOwnsObject : boolean;
     procedure AssertLocked; inline;
-    procedure AssertNotLocked; inline;
     procedure Clear; inline;
     function  GetValue: T; inline;
     procedure SetValue(const value: T); inline;
@@ -504,7 +503,7 @@ type
     function  TryBeginWrite(timeout: cardinal): boolean; overload; inline;
     {$IFEND LINUX or ANDROID}
     {$ENDIF OTL_HasLightweightMREW}
-    procedure Free; inline;
+    procedure Free; //inline;
     property Value: T read GetValue write SetValue;
   end; { Locked<T> }
 
@@ -1828,17 +1827,6 @@ begin
   {$ENDIF DEBUG}
 end; { Locked<T>.AssertLocked }
 
-procedure Locked<T>.AssertNotLocked;
-begin
-  // This is just a debugging helper. It catches probles in a single-threaded
-  // code. It may fail (not detect a problem) in a multithreaded code when
-  // one thread executes this test, another thread then locks the the value
-  // and first thread resumes execution.
-  {$IFDEF DEBUG}
-  Assert(FLockCount.Value = 0, 'Locked<T> is locked!');
-  {$ENDIF DEBUG}
-end; { Locked<T>.AssertNotLocked }
-
 {$IFDEF OTL_HasLightweightMREW}
 function Locked<T>.BeginRead: T;
 begin
@@ -1861,7 +1849,6 @@ end; { Locked<T>.BeginWrite }
 
 procedure Locked<T>.Clear;
 begin
-  AssertNotLocked;
   FLifecycle := nil;
   FInitialized := false;
   FValue := Default(T);
