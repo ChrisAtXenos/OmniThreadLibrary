@@ -36,10 +36,12 @@
 ///     Blog            : http://thedelphigeek.com
 ///   Contributors      : GJ, Lee_Nover, dottor_jeckill, Sean B. Durkin, VyPu
 ///   Creation date     : 2009-03-30
-///   Last modification : 2025-11-11
-///   Version           : 2.0
+///   Last modification : 2025-11-20
+///   Version           : 2.0a
 ///</para><para>
 ///   History:
+///     2.0a: 2025-11-20
+///       - Implemented Locked<T>.IsInitialized.
 ///     2.0: 2025-11-11
 ///       - Implemented TLightweightMREWEx extension to TLightweightMREW (Delphi 11+ only).
 ///         This class adds support for nested BeginWrite/EndWrite calls.
@@ -504,6 +506,7 @@ type
     {$IFEND LINUX or ANDROID}
     {$ENDIF OTL_HasLightweightMREW}
     procedure Free; //inline;
+    property IsInitialized: boolean read FInitialized;
     property Value: T read GetValue write SetValue;
   end; { Locked<T> }
 
