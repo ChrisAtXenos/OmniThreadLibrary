@@ -405,6 +405,7 @@ type
     {$ENDREGION}
     class procedure _RemoveWarnings; inline; static;
     procedure ClearIntf; inline;
+    function LogValue(depth: integer): string; overload;
   {$IFDEF MSWINDOWS}
     function  CastToAnsiString: AnsiString; inline;
     function  CastToWideString: WideString;
@@ -3031,8 +3032,19 @@ end; { TOmniValue.IsWideString }
 {$ENDIF}
 
 function TOmniValue.LogValue: string;
+begin
+  Result := LogValue(0);
+end; { TOmniValue.LogValue }
+
+function TOmniValue.LogValue(depth: integer): string;
 const
   CBoolStr: array [boolean] of string = ('F', 'T');
+var
+  arr: TOmniValueContainer;
+  autoDestroy: IOmniAutoDestroyObject;
+  i: integer;
+  maxItems: integer;
+  obj: TObject;
 begin
   try
     case DataType of
@@ -3041,17 +3053,64 @@ begin
       ovtInteger:     Result := '[4]' + AsString;
       ovtInt64:       Result := '[8]' + AsString;
       ovtDouble:      Result := '[D]' + AsString;
-      ovtObject:      Result := '[O]' + AsObject.ClassName;
+      ovtObject:      begin
+        if assigned(AsObject) then
+          Result := '[O]' + AsObject.ClassName + Format('($%p)', [pointer(AsObject)])
+        else
+          Result := '[O]nil';
+      end;
       ovtPointer:     Result := '[P]' + Format('%p', [AsPointer]);
       ovtDateTime:    Result := '[T]' + FormatDateTime('yyyymmddhhnnsszzz', AsDateTime);
-      ovtException:   Result := '[E]' + AsException.ClassName;
+      ovtException:   begin
+        if assigned(AsException) then
+          Result := '[E]' + AsException.ClassName + Format('($%p)', [pointer(AsException)])
+        else
+          Result := '[E]nil';
+      end;
       ovtExtended:    Result := '[X]' + AsString;
       ovtString:      Result := '[S]' + AsString;
-      ovtInterface:   Result := '[I]';
+      ovtInterface:   begin
+        if assigned(ovIntf) then begin
+          try
+            obj := ovIntf as TObject;
+            Result := '[I]' + obj.ClassName;
+          except
+            Result := '[I]assigned';
+          end;
+        end else
+          Result := '[I]nil';
+      end;
       ovtVariant:     Result := '[V]' + AsString;
-      ovtArray:       Result := '[A]' + IntToStr(AsArray.Count);
-      ovtRecord:      Result := '[R]';
-      ovtOwnedObject: Result := '[o]' + AsObject.ClassName;
+      ovtArray:       begin
+        arr := AsArray;
+        Result := '[A]' + IntToStr(arr.Count);
+        if (arr.Count > 0) and (depth < 2) then begin
+          Result := Result + ':[';
+          maxItems := Min(3, arr.Count);
+          for i := 0 to maxItems - 1 do begin
+            if i > 0 then
+              Result := Result + ', ';
+            Result := Result + arr[i].LogValue(depth + 1);
+          end;
+          if arr.Count > 3 then
+            Result := Result + ', ...';
+          Result := Result + ']';
+        end;
+      end;
+      ovtRecord:      begin
+        try
+          autoDestroy := ovIntf as IOmniAutoDestroyObject;
+          Result := '[R]' + IntToStr(autoDestroy.Size) + 'B';
+        except
+          Result := '[R]';
+        end;
+      end;
+      ovtOwnedObject: begin
+        if assigned(AsObject) then
+          Result := '[o]' + AsObject.ClassName + Format('($%p)', [pointer(AsObject)])
+        else
+          Result := '[o]nil';
+      end;
     {$IFDEF MSWINDOWS}
       ovtWideString:  Result := '[W]' + AsString;
       ovtAnsiString:  Result := '[N]' + AsString;
