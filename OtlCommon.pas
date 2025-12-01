@@ -35,10 +35,12 @@
 ///     Blog            : http://thedelphigeek.com
 ///   Contributors      : GJ, Lee_Nover, scarre, Sean B. Durkin, HHasenack
 ///   Creation date     : 2008-06-12
-///   Last modification : 2025-08-21
-///   Version           : 1.55a
+///   Last modification : 2025-12-01
+///   Version           : 1.56
 ///</para><para>
 ///   History:
+///     1.56: 2025-12-01
+///       - Improved LogValue.
 ///     1.55b: 2025-11-12
 ///       - Fixed TOmniEnvironment.LoadNUMAInfo.
 ///     1.55a: 2025-08-21
@@ -457,7 +459,7 @@ type
     function  IsRecord: boolean; inline;
     function  IsString: boolean; inline;
     function  IsVariant: boolean; inline;
-    function  LogValue: string;
+    function  LogValue: string; overload;
     class function Null: TOmniValue; static;
     function  RawData: PInt64; inline;
     procedure RawZero; inline;
@@ -3086,7 +3088,9 @@ begin
         Result := '[A]' + IntToStr(arr.Count);
         if (arr.Count > 0) and (depth < 2) then begin
           Result := Result + ':[';
-          maxItems := Min(3, arr.Count);
+          maxItems := arr.Count;
+          if maxItems > 3 then
+            maxItems := 3;
           for i := 0 to maxItems - 1 do begin
             if i > 0 then
               Result := Result + ', ';
@@ -3097,14 +3101,7 @@ begin
           Result := Result + ']';
         end;
       end;
-      ovtRecord:      begin
-        try
-          autoDestroy := ovIntf as IOmniAutoDestroyObject;
-          Result := '[R]' + IntToStr(autoDestroy.Size) + 'B';
-        except
-          Result := '[R]';
-        end;
-      end;
+      ovtRecord:      Result := '[R]';
       ovtOwnedObject: begin
         if assigned(AsObject) then
           Result := '[o]' + AsObject.ClassName + Format('($%p)', [pointer(AsObject)])
