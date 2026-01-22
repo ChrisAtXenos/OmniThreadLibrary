@@ -1778,6 +1778,14 @@ end; { TLightweightMREWEx.TryBeginWrite }
 
 { Locked<T> }
 
+procedure Locked<T>.Clear;
+begin
+  FLifecycle := nil;
+  FInitialized := false;
+  FValue := Default(T);
+  FOwnsObject := false;
+end; { Locked }
+
 constructor Locked<T>.Create(const value: T; ownsObject: boolean);
 begin
   {$IFDEF OTL_HasLightweightMREW}
@@ -1850,14 +1858,6 @@ begin
 end; { Locked<T>.BeginWrite }
 {$ENDIF OTL_HasLightweightMREW}
 
-procedure Locked<T>.Clear;
-begin
-  FLifecycle := nil;
-  FInitialized := false;
-  FValue := Default(T);
-  FOwnsObject := false;
-end; { Locked }
-
 {$IFDEF OTL_HasLightweightMREW}
 procedure Locked<T>.EndRead;
 begin
@@ -1881,6 +1881,23 @@ begin
   Acquire;
   Result := FValue;
 end; { Locked<T>.Enter }
+
+procedure Locked<T>.Leave;
+begin
+  {$IFDEF OTL_HasLightweightMREW}
+  FLock.EndWrite;
+  {$ELSE ~OTL_HasLightweightMREW}
+  FLock.Release;
+  {$ENDIF ~OTL_HasLightweightMREW}
+  {$IFDEF DEBUG}
+  FLockCount.Decrement;
+  {$ENDIF DEBUG}
+end; { Locked<T>.Leave }
+
+procedure Locked<T>.Release;
+begin
+  Leave;
+end; { Locked<T>.Release }
 
 procedure Locked<T>.Free;
 begin
@@ -1971,18 +1988,6 @@ begin
 end; { Locked<T>.Initialize }
 {$ENDIF OTL_ERTTI}
 
-procedure Locked<T>.Leave;
-begin
-  {$IFDEF OTL_HasLightweightMREW}
-  FLock.EndWrite;
-  {$ELSE ~OTL_HasLightweightMREW}
-  FLock.Release;
-  {$ENDIF ~OTL_HasLightweightMREW}
-  {$IFDEF DEBUG}
-  FLockCount.Decrement;
-  {$ENDIF DEBUG}
-end; { Locked<T>.Leave }
-
 procedure Locked<T>.Locked(proc: TProc);
 begin
   Acquire;
@@ -1998,11 +2003,6 @@ begin
     proc(Value);
   finally Release; end;
 end; { Locked<T>.Locked }
-
-procedure Locked<T>.Release;
-begin
-  Leave;
-end; { Locked<T>.Release }
 
 {$IFDEF OTL_HasLightweightMREW}
 function Locked<T>.TryBeginRead: boolean;

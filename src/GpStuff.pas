@@ -723,7 +723,7 @@ function  IFF(condit: boolean; iftrue, iffalse: TDateTime): TDateTime; overload;
 function  IFF64(condit: boolean; iftrue, iffalse: int64): int64;              {$IFDEF GpStuff_Inline}inline;{$ENDIF}
 {$IFDEF MSWINDOWS}
 {$IFDEF Unicode}
-function  IFF(condit: boolean; iftrue, iffalse: AnsiString): AnsiString; overload;    {$IFDEF GpStuff_Inline}inline;{$ENDIF}
+function  IFF(condit: boolean; const iftrue, iffalse: AnsiString): AnsiString; overload;    {$IFDEF GpStuff_Inline}inline;{$ENDIF}
 {$ENDIF Unicode}
 {$ENDIF MSWINDOWS}
 
@@ -949,7 +949,7 @@ function IndexOfListA(const value: AnsiString; const values: array of AnsiString
 {$IFDEF GpStuff_TArrayOfT}
 function LinearMap(value: real; const x, y: TArray<real>): real;
 
-function SplitList(const aList: string; delim: string; const quoteChar: string = '';
+function SplitList(const aList: string; const delim: string; const quoteChar: string = '';
   stripQuotes: boolean = true): TArray<string>; overload;
 function SplitList(const aList: string; delim: TSysCharSet; const quoteChar: string = '';
   stripQuotes: boolean = true): TArray<string>; overload;
@@ -1200,7 +1200,7 @@ end; { AutoExecute }
 {$ENDIF GpStuff_Anonymous}
 
 //copied from GpString unit
-procedure GetDelimiters(const list: string; delim: string; const quoteChar: string;
+procedure GetDelimiters(const list: string; const delim: string; const quoteChar: string;
   addTerminators: boolean; var delimiters: TDelimiters); overload;
 var
   chk   : boolean;
@@ -1405,7 +1405,7 @@ end; { IFF64 }
 
 {$IFDEF MSWINDOWS}
 {$IFDEF Unicode}
-function IFF(condit: boolean; iftrue, iffalse: AnsiString): AnsiString;
+function IFF(condit: boolean; const iftrue, iffalse: AnsiString): AnsiString;
 begin
   if condit then
     Result := iftrue
@@ -1505,6 +1505,26 @@ begin
     end; //with
   end; //for i
 end; { OpenArrayToVarArray }
+
+procedure OutputDebugString(const msg: string);
+begin
+{$IFDEF MSWINDOWS}
+{$WARN SYMBOL_PLATFORM OFF}
+  if DebugHook <> 0 then
+    Windows.OutputDebugString(PChar(msg));
+{$WARN SYMBOL_PLATFORM ON}
+{$ENDIF}
+end; { OutputDebugString }
+
+procedure OutputDebugString(const msg: string; const params: array of const);
+begin
+{$IFDEF MSWINDOWS}
+{$WARN SYMBOL_PLATFORM OFF}
+  if DebugHook <> 0 then
+    OutputDebugString(Format(msg, params));
+{$WARN SYMBOL_PLATFORM ON}
+{$ENDIF}
+end; { OutputDebugString }
 
 function FormatDataSize(value: int64): string;
 begin
@@ -2264,7 +2284,7 @@ begin
   raise Exception.Create('LinearMap: Internal error. This line should never be executed.');
 end; { LinearMap }
 
-function SplitList(const aList: string; delim: string; const quoteChar: string = '';
+function SplitList(const aList: string; const delim: string; const quoteChar: string = '';
   stripQuotes: boolean = true): TArray<string>;
 var
   delimiters: TDelimiters;
@@ -2687,26 +2707,6 @@ begin
   intf._Release;
 end; { GetRefCount }
 
-procedure OutputDebugString(const msg: string);
-begin
-{$IFDEF MSWINDOWS}
-{$WARN SYMBOL_PLATFORM OFF}
-  if DebugHook <> 0 then
-    Windows.OutputDebugString(PChar(msg));
-{$WARN SYMBOL_PLATFORM ON}
-{$ENDIF}
-end; { OutputDebugString }
-
-procedure OutputDebugString(const msg: string; const params: array of const);
-begin
-{$IFDEF MSWINDOWS}
-{$WARN SYMBOL_PLATFORM OFF}
-  if DebugHook <> 0 then
-    OutputDebugString(Format(msg, params));
-{$WARN SYMBOL_PLATFORM ON}
-{$ENDIF}
-end; { OutputDebugString }
-
 {$IFDEF GpStuff_TThread_Current}
 procedure SetDataBreakpoint(idx: TDataBreakpointIndex; address: pointer;
   condition: TDataBreakpointCondition; dataSize: TDataBreakpointDataSize);
@@ -3072,6 +3072,70 @@ end; { TGpMemoryStream.Write }
 
 { TGpBuffer }
 
+procedure TGpBuffer.Add(b: byte);
+begin
+  FData.Seek(0, soEnd);
+  FData.Write(b, 1);
+end; { TGpBuffer.Add }
+
+{$IFDEF MSWINDOWS}
+procedure TGpBuffer.Add(ch: AnsiChar);
+begin
+  Add(byte(ch));
+end; { TGpBuffer.Add }
+{$ENDIF}
+
+procedure TGpBuffer.Allocate(size: integer);
+begin
+  Assert(size >= 0);
+  FData.Size := size;
+end; { TGpBuffer.Allocate }
+
+procedure TGpBuffer.Append(data: pointer; size: integer);
+begin
+  if size > 0 then begin
+    FData.Seek(0, soEnd);
+    FData.Write(data^, size);
+  end;
+end; { TGpBuffer.Append }
+
+procedure TGpBuffer.Append(stream: TStream);
+begin
+  if stream.Size > 0 then begin
+    FData.Seek(0, soEnd);
+    AsStream.CopyFrom(stream, 0);
+  end;
+end; { TGpBuffer.Append }
+
+procedure TGpBuffer.Append(const buffer: IGpBuffer);
+begin
+  Append(buffer.Value, buffer.Size);
+end; { TGpBuffer.Append }
+
+procedure TGpBuffer.Assign(data: pointer; size: integer);
+begin
+  Allocate(size);
+  if size > 0 then
+    Move(data^, Value^, size);
+end; { TGpBuffer.Assign }
+
+procedure TGpBuffer.Assign(stream: TStream);
+begin
+  Size := 0;
+  Append(stream);
+end; { TGpBuffer.Assign }
+
+procedure TGpBuffer.Assign(const buffer: IGpBuffer);
+begin
+  Size := 0;
+  Append(buffer);
+end; { TGpBuffer.Assign }
+
+procedure TGpBuffer.Clear;
+begin
+  Allocate(0);
+end; { TGpBuffer.Clear }
+
 constructor TGpBuffer.Create;
 begin
   inherited Create;
@@ -3175,70 +3239,6 @@ class function TGpBuffer.Make: IGpBuffer;
 begin
   Result := TGpBuffer.Create;
 end; { TGpBuffer.Make }
-
-procedure TGpBuffer.Add(b: byte);
-begin
-  FData.Seek(0, soEnd);
-  FData.Write(b, 1);
-end; { TGpBuffer.Add }
-
-{$IFDEF MSWINDOWS}
-procedure TGpBuffer.Add(ch: AnsiChar);
-begin
-  Add(byte(ch));
-end; { TGpBuffer.Add }
-{$ENDIF}
-
-procedure TGpBuffer.Allocate(size: integer);
-begin
-  Assert(size >= 0);
-  FData.Size := size;
-end; { TGpBuffer.Allocate }
-
-procedure TGpBuffer.Append(data: pointer; size: integer);
-begin
-  if size > 0 then begin
-    FData.Seek(0, soEnd);
-    FData.Write(data^, size);
-  end;
-end; { TGpBuffer.Append }
-
-procedure TGpBuffer.Append(stream: TStream);
-begin
-  if stream.Size > 0 then begin
-    FData.Seek(0, soEnd);
-    AsStream.CopyFrom(stream, 0);
-  end;
-end; { TGpBuffer.Append }
-
-procedure TGpBuffer.Append(const buffer: IGpBuffer);
-begin
-  Append(buffer.Value, buffer.Size);
-end; { TGpBuffer.Append }
-
-procedure TGpBuffer.Assign(data: pointer; size: integer);
-begin
-  Allocate(size);
-  if size > 0 then
-    Move(data^, Value^, size);
-end; { TGpBuffer.Assign }
-
-procedure TGpBuffer.Assign(stream: TStream);
-begin
-  Size := 0;
-  Append(stream);
-end; { TGpBuffer.Assign }
-
-procedure TGpBuffer.Assign(const buffer: IGpBuffer);
-begin
-  Size := 0;
-  Append(buffer);
-end; { TGpBuffer.Assign }
-
-procedure TGpBuffer.Clear;
-begin
-  Allocate(0);
-end; { TGpBuffer.Clear }
 
 function TGpBuffer.Equals(const buffer: IGpBuffer): boolean;
 begin
