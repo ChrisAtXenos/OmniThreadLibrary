@@ -298,6 +298,7 @@ uses
   {$IF CompilerVersion >= 20} //D2009+
     {$DEFINE GpStuff_Anonymous}
     {$DEFINE GpStuff_Generics}
+    {$DEFINE GpStuff_TBytes}
   {$IFEND}
   {$IF CompilerVersion >= 21} //D2010+
     {$DEFINE GpStuff_NativeInt}
@@ -821,6 +822,9 @@ type
   public
     constructor Create(const pattern: IGpBuffer; ignoreCase: boolean = false); overload;
     constructor Create(const pattern: AnsiString; ignoreCase: boolean = false); overload;
+    {$IFDEF GpStuff_TBytes}
+    constructor Create(const pattern: TBytes; ignoreCase: boolean = false); overload;
+    {$ENDIF GpStuff_TBytes}
     function FindIn(const buffer: PByte; size: integer): integer; overload;
     function FindIn(const buffer: IGpBuffer): integer; overload;
     function FindIn(const buffer: AnsiString): integer; overload;
@@ -1657,6 +1661,13 @@ constructor TBMSearch.Create(const pattern: AnsiString; ignoreCase: boolean);
 begin
   Create(TGpBuffer.Make(pattern), ignoreCase);
 end; { TBMSearch.Create }
+
+{$IFDEF GpStuff_TBytes}
+constructor TBMSearch.Create(const pattern: TBytes; ignoreCase: boolean);
+begin
+  Create(TGpBuffer.Make(pattern), ignoreCase);
+end; { TBMSearch.Create }
+{$ENDIF GpStuff_TBytes}
 
 class function TBMSearch.Find(const pattern, buffer: IGpBuffer; ignoreCase: boolean = false): integer;
 var
@@ -2579,7 +2590,7 @@ function TGpTraceable._AddRef: integer;
 begin
   Result := gtRefCount.Increment;
   if gtLogRef then
-    OutputDebugString(PChar(Format('TGpTraceable._AddRef: [%s] %d', [ClassName, Result])));
+    OutputDebugString(PChar(Format('TGpTraceable._AddRef: [%s %p] %d', [ClassName, pointer(Self), Result])));
   {$IFDEF MSWINDOWS}
   DebugBreak(gtTraceRef);
   {$ENDIF}
@@ -2592,7 +2603,7 @@ begin
   {$ENDIF}
   Result := gtRefCount.Decrement;
   if gtLogRef then
-    OutputDebugString(PChar(Format('TGpTraceable._Release: [%s] %d', [ClassName, Result])));
+    OutputDebugString(PChar(Format('TGpTraceable._Release: [%s %p] %d', [ClassName, pointer(Self), Result])));
   if Result = 0 then
     Destroy;
 end; { TGpTraceable._Release }

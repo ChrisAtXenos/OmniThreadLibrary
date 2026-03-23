@@ -3042,11 +3042,12 @@ function TOmniValue.LogValue(depth: integer): string;
 const
   CBoolStr: array [boolean] of string = ('F', 'T');
 var
-  arr: TOmniValueContainer;
-  autoDestroy: IOmniAutoDestroyObject;
-  i: integer;
+  arr     : TOmniValueContainer;
+  i       : integer;
   maxItems: integer;
-  obj: TObject;
+{$IFDEF OTL_CanCatInterfaceToObject}
+  obj     : TObject;
+{$ENDIF OTL_CanCatInterfaceToObject}
 begin
   try
     case DataType of
@@ -3073,12 +3074,16 @@ begin
       ovtString:      Result := '[S]' + AsString;
       ovtInterface:   begin
         if assigned(ovIntf) then begin
+          {$IFDEF OTL_CanCatInterfaceToObject}
           try
             obj := ovIntf as TObject;
             Result := '[I]' + obj.ClassName;
           except
             Result := '[I]assigned';
           end;
+          {$ELSE ~OTL_CanCatInterfaceToObject}
+            Result := '[I]assigned';
+          {$ENDIF ~OTL_CanCatInterfaceToObject}
         end else
           Result := '[I]nil';
       end;

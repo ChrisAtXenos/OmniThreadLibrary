@@ -349,7 +349,9 @@ begin
       wait := CSecondSleep;
     end
     else if lasterr = ERROR_INVALID_WINDOW_HANDLE then
-      RaiseLastOSError(lasterr, #13#10'Possible cause: Thread that created OmniThreadLibrary task does not exist anymore. Task should be destroyed in the same thread that created it.')
+      RaiseLastOSError(lasterr {$IFDEF OTL_RaiseLastOSErrorHasAdditionalInfo},
+                       #13#10'Possible cause: Thread that created OmniThreadLibrary task does not exist anymore. Task should be destroyed in the same thread that created it.'
+                       {$ENDIF OTL_RaiseLastOSErrorHasAdditionalInfo})
     else
       RaiseLastOSError(lasterr);
   end;

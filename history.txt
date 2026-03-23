@@ -1,7 +1,25 @@
-3.07.12: <<unreleased>>
+3.08: <<unreleased>>
+
+- New features:
+  - Implemented TLightweightMREWEx extension to TLightweightMREW (Delphi 11+ only).
+    This class adds support for nested BeginWrite/EndWrite calls.
+    See https://www.thedelphigeek.com/2021/02/readers-writ-47358-48721-45511-46172.html
+    for more information.
+  - Implemented interface ILightweightMREWEx with the same public
+    methods as TLightweightMREWEx and implementing class
+    TLightweightMREWExImpl that wraps TLightweightMREWEx.
+  - Added methods Enter: T and Leave to Locked<T>.
+  - Added methods BeginRead, TryBeginRead, EndRead, BeginWrite,
+    TryBeginWrite, EndWrite to Locked<T> (Delphi 11+ only).
+  - Locked<T>.Access/Release now implement locking with a
+    SRW lock (when available) in 'write' access mode. This is functionally
+    identical to the old implementation (critical section).
+  - Implemented Locked<T>.IsInitialized.
+  - On Windows, SetThreadName from OtlCommon.Utils also calls 
+    SetThreadDescription Windows API.
 
 - Bug fixes:
-  - Fixed bad 64-bit pointer casts in OtlTaskControl.
+  - Fixed bad 64-bit pointer casts in OtlTaskControl. Now works with Delph 13.1.
 
 3.07.11: 2025-10-22
 
